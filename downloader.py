@@ -38,50 +38,53 @@ class VideoDownloader:
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            # Robust Anti-bot options
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'referer': 'https://www.google.com/',
+            # Anti-bot options (Force iOS Client - Best for Cloud)
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'referer': 'https://www.youtube.com/',
             'socket_timeout': 30,
-            'retries': 10,
+            'retries': 20,
             'fragment_retries': 10,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android', 'web'], # iOS often works better for DCs
+                    'player_client': ['ios'],
                     'player_skip': ['webpage', 'configs', 'js'],
                     'include_ssl_logs': [False]
                 }
             }
         }
         
-        if cookie_file:
-            self.ydl_opts_base['cookiefile'] = cookie_file
-        
         try:
             with yt_dlp.YoutubeDL(self.ydl_opts_base) as ydl:
                 info = ydl.extract_info(url, download=False)
                 
-                # Process formats (Same logic as before)
+                # Process formats
                 formats_summary = []
                 seen_resolutions = set()
-                best_audio_size = 0
                 
-                # Audio size check
+                # audio size estimate (take the best audio)
+                best_audio_size = 0
                 for f in info.get('formats', []):
                     if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
+                         # It's audio only
                          size = f.get('filesize') or f.get('filesize_approx') or 0
                          if size > best_audio_size:
                              best_audio_size = size
 
                 # Video formats
                 for f in info.get('formats', []):
+                    # Skip audio-only or video-only if we serve mixed, but usually we want to see available resolutions
                     height = f.get('height')
                     if not height: continue
                     
                     if height not in seen_resolutions:
                         seen_resolutions.add(height)
+                        # Estimate size: video stream + audio stream
                         v_size = f.get('filesize') or f.get('filesize_approx') or 0
                         total_estimate = v_size + best_audio_size if v_size else 0
+                        
+                        # Determine ext (default to mp4 if we merge)
                         ext = 'mp4' 
+                        
                         formats_summary.append({
                             'label': f"{height}p",
                             'size': total_estimate,
@@ -90,8 +93,10 @@ class VideoDownloader:
                             'ext': ext
                         })
                 
+                # Sort by resolution desc
                 formats_summary.sort(key=lambda x: x['height'], reverse=True)
                 
+                # Add human readable strings
                 options = []
                 for fmt in formats_summary:
                     size_str = self._format_bytes(fmt['size'])
@@ -101,6 +106,7 @@ class VideoDownloader:
                         'type': 'video'
                     })
                 
+                # Add Audio Only option
                 audio_size_str = self._format_bytes(best_audio_size)
                 options.append({
                     'label': f"Audio Only - MP3 (~{audio_size_str})",

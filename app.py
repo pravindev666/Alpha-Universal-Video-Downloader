@@ -28,21 +28,16 @@ def main():
 
     # Logic handles 'url' variable which is updated upon form submission
 
-    # Advanced Options (Cookies)
-    with st.expander("🔓 Advanced Options (Fix Download Errors)"):
-        st.info("If you see '403 Forbidden' errors, paste your **Netscape Format** cookies here. Use an extension like 'Get cookies.txt LOCALLY' to get them from YouTube.")
-        cookies = st.text_area("Paste Cookies Here:", placeholder="# Netscape HTTP Cookie File...\n.youtube.com\tTRUE\t/...")
-
     if url:
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
             with st.spinner("Fetching video info..."):
                 # Pass cookies to get_video_info
-                info = downloader.get_video_info(url, cookies_content=cookies if cookies else None)
+                info = downloader.get_video_info(url)
                 if info:
                     st.session_state['video_info'] = info
                     st.session_state['last_url'] = url
                 else:
-                    st.error("Could not fetch video info. Please check the URL or try adding cookies.")
+                    st.error("Could not fetch video info. Please check the URL.")
 
         if 'video_info' in st.session_state and st.session_state.get('last_url') == url:
             info = st.session_state['video_info']
@@ -75,7 +70,7 @@ def main():
             # Download Action
             if st.button("Fetch Video", type="primary"):
                 # Pass cookies to download_wrapper
-                download_wrapper(downloader, url, selected_format_id, cookies if cookies else None)
+                download_wrapper(downloader, url, selected_format_id)
             
             # Show download button if file exists in session
             if 'last_file' in st.session_state and st.session_state.get('last_url_downloaded') == url:
