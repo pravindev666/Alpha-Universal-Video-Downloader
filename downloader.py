@@ -24,13 +24,22 @@ class VideoDownloader:
 
     def get_video_info(self, url: str) -> Optional[Dict]:
         """Extract video metadata and available formats"""
-        ydl_opts = {
+        self.ydl_opts_base = {
             'quiet': True,
             'no_warnings': True,
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            # Anti-bot options
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'referer': 'https://www.google.com/',
+            'socket_timeout': 15,
+            'retries': 10,
+            'fragment_retries': 10,
         }
         
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(self.ydl_opts_base) as ydl:
                 info = ydl.extract_info(url, download=False)
                 
                 # Process formats
