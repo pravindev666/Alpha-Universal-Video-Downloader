@@ -1,4 +1,9 @@
+import yt_dlp
+import os
+import tempfile
 import requests
+from pathlib import Path
+from typing import Optional, Dict, List
 
 # Free proxies provided by user (Auto-rotation)
 PROXIES = [
