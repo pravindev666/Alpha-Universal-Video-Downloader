@@ -183,23 +183,22 @@ def main():
             """)
             
         st.info("💡 **Pro Tip:** If a video fails or says 'Login Required', simply upload your `cookies.txt` file or add it to the server secrets to bypass the block.")
-        
-        # Debug Version Info
-        import yt_dlp
-        st.caption(f"Engine Version: `yt-dlp {yt_dlp.version.__version__}`")
 
+    # Main Footer Info
+    import yt_dlp
+    import datetime
     st.markdown(
-        """
+        f"""
 <div style='text-align: center; color: #666;'>
     <h3 style='margin-bottom: 5px; font-size: 24px;'>App by Pravin A Mathew</h3>
     <p style='font-size: 0.8em; margin: 0;'>Property of Zeta Aztra Technologies</p>
     <p style='font-size: 0.8em; margin: 0;'>Operated by Zeta Aztra Technologies (Individual Proprietorship, India)</p>
-    <p style='font-size: 0.8em; margin-top: 5px; margin-bottom: 15px;'>© 2026 Zeta Aztra Technologies. All Rights Reserved.</p>
-    <p style='color: #ff4b4b; font-weight: bold; margin-bottom: 5px;'>⚠️ DISCLAIMER: FOR PERSONAL USE ONLY</p>
+    <p style='font-size: 0.8em; margin-top: 5px;'>© 2026 Zeta Aztra Technologies. All Rights Reserved.</p>
+    <p style='font-size: 0.7em; color: #888;'>Engine: <code>yt-dlp {yt_dlp.version.__version__}</code> | Last App Update: <code>{datetime.datetime.now().strftime("%H:%M:%S")}</code></p>
+    <p style='color: #ff4b4b; font-weight: bold; margin-bottom: 5px; margin-top: 10px;'>⚠️ DISCLAIMER: FOR PERSONAL USE ONLY</p>
     <p style='font-size: 0.75em; line-height: 1.4; max-width: 800px; margin: 0 auto;'>
         This tool is designed for educational purposes and personal archiving only. 
         Users are responsible for ensuring they have the right to download and use the content. 
-        Running this tool to infringe on copyright or violate terms of service of any platform is strictly prohibited. 
         The author accepts no liability for misuse of this application.
     </p>
 </div>

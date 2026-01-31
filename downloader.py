@@ -12,6 +12,14 @@ PROXIES = [
     'http://20.206.106.192:80',
 ]
 
+import re
+try:
+    from yt_dlp.extractor.instagram import InstagramIE
+    # Monkeypatch to support Threads URLs via Instagram extractor
+    InstagramIE._VALID_URL = r'(?P<url>https?://(?:www\.)?(?:instagram\.com|threads\.net|threads\.com)(?:/(?!share/)[^/?#]+)?/(?:p|tv|reels?|post|t(?!/audio/))/(?P<id>[^/?#&]+))'
+except ImportError:
+    pass
+
 class VideoDownloader:
     def __init__(self, output_dir: str = "downloads"):
         self.output_dir = Path(output_dir)
@@ -45,16 +53,21 @@ class VideoDownloader:
 
     def _sanitize_url(self, url: str) -> str:
         """Clean URL and handle domain hotfixes"""
-        # Remove ALL spaces (start, end, and internal)
-        url = url.strip().replace(" ", "")
+        # Remove ALL whitespace characters (including non-breaking spaces, tabs, etc.)
+        url = re.sub(r'\s+', '', url)
         
-        # Threads hotfix: Meta acquired threads.com, but yt-dlp might only match threads.net
+        # Threads partial hotfix: If user pated "t/ID" or "post/ID", prepend domain
+        if url.startswith('t/') or url.startswith('post/'):
+             url = "https://www.threads.net/" + url
+        elif '@' in url and '/post/' in url and not url.startswith('http'):
+             url = "https://www.threads.net/" + url
+
+        # Threads domain hotfix
         if 'threads.com' in url:
             url = url.replace('threads.com', 'threads.net')
         
         # Threads format normalization: @user/post/ID -> t/ID (Better for generic extraction)
         if 'threads.net/@' in url and '/post/' in url:
-            import re
             match = re.search(r'/post/([^/?#\s]+)', url)
             if match:
                 post_id = match.group(1)
