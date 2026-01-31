@@ -67,6 +67,9 @@ def main():
             pass
 
     if url:
+        # Create a container for the status/error area
+        status_area = st.container()
+        
         # Auto-fetch if info is missing or URL changed
         if 'video_info' not in st.session_state:
             with st.spinner("Fetching video info..."):
@@ -82,11 +85,13 @@ def main():
                     st.session_state['last_url'] = url
                 else:
                     error_msg = info.get('error') if info else "Unknown error"
-                    st.error(f"❌ Error fetching video: {error_msg}")
-                    if "403" in error_msg:
-                         st.warning("⚠️ YouTube is blocking the connection. This is common with Cloud Servers.")
-                    elif "Sign in" in error_msg or "login required" in error_msg.lower():
-                         st.warning("⚠️ This video requires a login (Instagram/Age Restricted). Please upload cookies to fix this.")
+                    with status_area:
+                        st.error(f"❌ Error fetching video: {error_msg}")
+                        if "403" in error_msg:
+                            st.warning("⚠️ YouTube is blocking the connection. This is common with Cloud Servers.")
+                        elif "Sign in" in error_msg or "login required" in error_msg.lower():
+                            st.warning("⚠️ This video requires a login (Instagram/Age Restricted). Please upload cookies to fix this.")
+                    return # Stop here if error
 
         if 'video_info' in st.session_state and st.session_state.get('last_url') == url:
             info = st.session_state['video_info']

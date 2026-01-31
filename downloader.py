@@ -45,7 +45,9 @@ class VideoDownloader:
 
     def _sanitize_url(self, url: str) -> str:
         """Clean URL and handle domain hotfixes"""
-        url = url.strip()
+        # Remove ALL spaces (start, end, and internal)
+        url = url.strip().replace(" ", "")
+        
         # Threads hotfix: Meta acquired threads.com, but yt-dlp might only match threads.net
         if 'threads.com' in url:
             url = url.replace('threads.com', 'threads.net')
@@ -60,6 +62,8 @@ class VideoDownloader:
                 
         return url
 
+    def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
+        """Extract video metadata using robust anti-bot settings, optional cookies, and proxy fallback"""
         url = self._sanitize_url(url)
         print(f"DEBUG: Processing sanitized URL: {url}")
         
