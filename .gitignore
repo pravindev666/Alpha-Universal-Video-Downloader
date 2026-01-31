@@ -25,5 +25,6 @@ pip-delete-this-directory.txt
 # Secrets
 cookies.txt
 cookie.txt
+*cookies.txt
 secrets.toml
 
