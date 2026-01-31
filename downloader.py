@@ -119,12 +119,20 @@ class VideoDownloader:
         if cookie_file:
             base_opts['cookiefile'] = cookie_file
 
+        # Add geo-bypass and IPv4 forcing for cloud environments
+        base_opts['geo_bypass'] = True
+        base_opts['source_address'] = '0.0.0.0'  # Force IPv4
+
         try:
-            # YouTube specific "Brute Force" Retry Strategy
+            # YouTube specific "Brute Force" Retry Strategy (ENHANCED for Cloud)
             # We try different "extractor_args" configurations until one sticks
             yt_configs = [
-                {'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js'}}, # Fastest, often works
+                {'youtube': {'player_client': 'android_creator'}},  # NEW - Often bypasses cloud blocks
+                {'youtube': {'player_client': 'ios_creator'}},      # NEW - Alternative creator client
+                {'youtube': {'player_client': 'tv_embedded'}},      # NEW - TV client often works
+                {'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js'}}, # Fast
                 {'youtube': {'player_client': 'ios'}}, # Solid fallback
+                {'youtube': {'player_client': 'mweb'}}, # Mobile web
                 {'youtube': {'player_client': 'web'}}, # Traditional
                 {} # Default fallback
             ]
