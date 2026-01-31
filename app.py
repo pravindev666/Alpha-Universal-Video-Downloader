@@ -48,8 +48,8 @@ def main():
                     st.error(f"❌ Error fetching video: {error_msg}")
                     if "403" in error_msg:
                          st.warning("⚠️ YouTube is blocking the connection. This is common with Cloud Servers.")
-                    elif "Sign in" in error_msg:
-                         st.warning("⚠️ This video requires a login (Age Restricted or Premium).")
+                    elif "Sign in" in error_msg or "login required" in error_msg.lower():
+                         st.warning("⚠️ This video requires a login (Instagram/Age Restricted). Please upload cookies to fix this.")
 
         if 'video_info' in st.session_state and st.session_state.get('last_url') == url:
             info = st.session_state['video_info']
