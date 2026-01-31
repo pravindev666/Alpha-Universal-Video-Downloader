@@ -30,15 +30,38 @@ def main():
     
     # Cookie Upload (Optional)
     cookies = st.file_uploader("🍪 Cookies (Optional - for private/age-restricted videos)", type=['txt', 'cookies'], help="Upload Netscape cookies.txt file")
+    
+    # 🍪 AUTOMATIC COOKIE LOADING (The "No Headache" Fix)
+    # Check for server-side cookies so users don't have to upload anything
+    server_cookies = None
+    
+    # Priority 1: Check Streamlit Secrets (Best for Cloud)
+    if not server_cookies:
+        try:
+            if "cookies" in st.secrets:
+                server_cookies = st.secrets["cookies"]
+                st.toast("✅ Using Server Credentials", icon="🍪")
+        except:
+            pass
+            
+    # Priority 2: Check local file (Best for Local Development)
+    if not server_cookies and os.path.exists("cookies.txt"):
+        try:
+            with open("cookies.txt", "r") as f:
+                server_cookies = f.read()
+            st.toast("✅ Using Local Cookies File", icon="🍪")
+        except:
+            pass
 
     if url:
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
             with st.spinner("Fetching video info..."):
-                # Handle cookies
-                cookies_content = cookies.getvalue().decode("utf-8") if cookies else None
+                # Handle cookies: User Upload > Server Default > None
+                user_cookies = cookies.getvalue().decode("utf-8") if cookies else None
+                final_cookies = user_cookies if user_cookies else server_cookies
                 
                 # Pass cookies to get_video_info
-                info = downloader.get_video_info(url, cookies_content=cookies_content)
+                info = downloader.get_video_info(url, cookies_content=final_cookies)
                 
                 if info and 'error' not in info:
                     st.session_state['video_info'] = info
@@ -81,9 +104,24 @@ def main():
             
             # Download Action
             if st.button("Fetch Video", type="primary"):
-                # Pass cookies to download_wrapper
-                cookies_content = cookies.getvalue().decode("utf-8") if cookies else None
-                download_wrapper(downloader, url, selected_format_id, cookies_content)
+                # Resolve cookies again for the download action (User > Server > None)
+                # Note: We duplicate logic briefly here or rely on session state if we refactored, 
+                # but simplest is to just re-read since variables are local scope.
+                
+                user_c = cookies.getvalue().decode("utf-8") if cookies else None
+                
+                # Re-fetch server cookies if needed (conceptually cleaner to store in session, but this is fast)
+                server_c = None
+                try: 
+                    if "cookies" in st.secrets: server_c = st.secrets["cookies"]
+                except: pass
+                if not server_c and os.path.exists("cookies.txt"):
+                    try: server_c = open("cookies.txt", "r").read()
+                    except: pass
+                
+                final_c = user_c if user_c else server_c
+                
+                download_wrapper(downloader, url, selected_format_id, final_c)
             
             # Show download button if file exists in session
             if 'last_file' in st.session_state and st.session_state.get('last_url_downloaded') == url:
