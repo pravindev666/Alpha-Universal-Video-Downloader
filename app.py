@@ -14,22 +14,30 @@ def main():
     # Initialize downloader
     downloader = VideoDownloader()
 
+    # CRITICAL: Clear session if URL changes to avoid "ghost" metadata
+    if 'last_url' not in st.session_state:
+        st.session_state['last_url'] = ""
+
     # URL Input (Removed form for reactivity)
     c1, c2 = st.columns([4, 1])
     with c1:
-        url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible").strip()
+        # We use a key for the text input to ensure it's tracked properly
+        url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", key="url_input").strip()
+    
     with c2:
         st.write("") # Spacer
         st.write("")
-        submit_btn = st.button("🔍 Preview", type="secondary")
-            
-    # CRITICAL: Clear session if URL changes to avoid "ghost" metadata
-    if url != st.session_state.get('last_url'):
-        if 'video_info' in st.session_state: del st.session_state['video_info']
-        if 'last_file' in st.session_state: del st.session_state['last_file']
+        if st.button("🔄 Clear", help="Click to reset the app"):
+            for key in ['video_info', 'last_file', 'last_url', 'last_url_downloaded']:
+                if key in st.session_state: del st.session_state[key]
+            st.rerun()
+
+    # Detect URL change and wipe old state immediately
+    if url != st.session_state['last_url']:
+        for key in ['video_info', 'last_file']:
+            if key in st.session_state: del st.session_state[key]
         st.session_state['last_url'] = url
-            
-    # Logic handles 'url' variable which is updated upon form submission
+        st.rerun() # Force fresh state for the new URL
 
     # Logic handles 'url' variable which is updated upon form submission
     
@@ -170,6 +178,10 @@ def main():
             """)
             
         st.info("💡 **Pro Tip:** If a video fails or says 'Login Required', simply upload your `cookies.txt` file or add it to the server secrets to bypass the block.")
+        
+        # Debug Version Info
+        import yt_dlp
+        st.caption(f"Engine Version: `yt-dlp {yt_dlp.version.__version__}`")
 
     st.markdown(
         """

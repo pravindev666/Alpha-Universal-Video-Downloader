@@ -60,9 +60,8 @@ class VideoDownloader:
                 
         return url
 
-    def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
-        """Extract video metadata using robust anti-bot settings, optional cookies, and proxy fallback"""
         url = self._sanitize_url(url)
+        print(f"DEBUG: Processing sanitized URL: {url}")
         
         cookie_file = None
         if cookies_content:
