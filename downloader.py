@@ -38,17 +38,16 @@ class VideoDownloader:
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            # Anti-bot options (Force iOS Client - Best for Cloud)
-            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            # Anti-bot options (Standard Android Client)
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'referer': 'https://www.youtube.com/',
             'socket_timeout': 30,
             'retries': 20,
-            'fragment_retries': 10,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios'],
-                    'player_skip': ['webpage', 'configs', 'js'],
-                    'include_ssl_logs': [False]
+                    'player_client': 'android',
+                    'player_skip': 'webpage,configs,js',
+                    'include_ssl_logs': False
                 }
             }
         }
