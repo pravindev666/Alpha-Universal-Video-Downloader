@@ -1,0 +1,45 @@
+name: Update yt-dlp
+
+on:
+  schedule:
+    # Run every Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Update requirements
+        run: |
+          pip install yt-dlp
+          # Get installed version
+          VERSION=$(pip show yt-dlp | grep Version | awk '{print $2}')
+          # Update requirements.txt preserving other deps
+          # This simple sed works if yt-dlp is the first line or we just rewrite it
+          # A safer way is to just upgrade everything or specific package
+          sed -i "s/yt-dlp>=.*/yt-dlp>=$VERSION/" requirements.txt
+          echo "Updated to yt-dlp version $VERSION"
+          
+      - name: Commit and Push
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          
+          # Check if there are changes
+          if [[ -n $(git status -s) ]]; then
+            git add requirements.txt
+            git commit -m "Auto-update yt-dlp to latest version"
+            git push
+          else
+            echo "No changes to commit"
+          fi

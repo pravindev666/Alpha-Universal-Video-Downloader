@@ -1,0 +1,23 @@
+# Downloads
+downloads/
+*.mp4
+*.webm
+*.mp3
+*.mkv
+*.exe
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Streamlit
+.streamlit/

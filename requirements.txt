@@ -1,0 +1,5 @@
+yt-dlp>=2024.10.22
+pillow
+requests>=2.32.2
+tqdm
+streamlit

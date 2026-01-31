@@ -1,0 +1,596 @@
+# Universal Media Downloader (UMD) – Technical Blueprint
+
+## 0. Hard Truths (Read Before Coding)
+
+1. **There is NO single universal method** to download videos from all platforms.
+   - Each platform actively **obfuscates, rate-limits, fingerprints, and breaks scrapers**.
+   - Instagram, Facebook, Threads, LinkedIn rotate signatures weekly.
+2. Any solution that claims "paste link → download anything forever" is **lying**.
+3. Your system must be:
+   - Modular
+   - Replaceable
+   - Failure-tolerant
+4. Expect **constant maintenance**.
+
+If you are not willing to update extractors monthly, **stop here**.
+
+---
+
+## 1. Target Platforms (Phase-wise)
+
+### Phase 1 (Feasible without login)
+- Public Instagram Reels
+- Public Instagram Posts (single video)
+- Public Facebook videos
+- LinkedIn public videos
+- Twitter/X videos (via HLS)
+- Generic MP4 / HLS links
+
+### Phase 2 (Login / Cookies required)
+- Instagram private posts
+- Facebook private videos
+- Threads
+- Instagram carousels (mixed media)
+- Stories
+
+---
+
+## 2. High-Level Architecture
+
+
+┌──────────────┐
+│ CLI / GUI │
+└──────┬───────┘
+│
+┌──────▼─────────┐
+│ URL Classifier │
+└──────┬─────────┘
+│
+┌──────▼─────────┐
+│ Extractor Core │
+│ (Plugin-based) │
+└──────┬─────────┘
+│
+┌──────▼─────────┐
+│ Media Resolver │
+│ (MP4 / HLS) │
+└──────┬─────────┘
+│
+┌──────▼─────────┐
+│ Downloader │
+│ (aria2/ffmpeg)│
+└──────┬─────────┘
+│
+┌──────▼─────────┐
+│ File Manager │
+└────────────────┘
+
+
+---
+
+## 3. Core Design Principle
+
+### ❌ What NOT to do
+- One massive `if-else` script
+- Hardcoding URLs
+- Direct scraping without abstraction
+
+### ✅ What TO do
+- **Extractor interface**
+- Each platform = **independent module**
+- Central orchestration
+
+---
+
+## 4. Technology Stack
+
+| Layer | Choice | Reason |
+|----|----|----|
+| Language | Python 3.11+ | Async + ecosystem |
+| HTTP | httpx | HTTP/2, async |
+| Parsing | BeautifulSoup + regex | HTML fallback |
+| Media | yt-dlp | Battle-tested |
+| HLS | ffmpeg | Mandatory |
+| Download | aria2 | Speed & resume |
+| CLI | Typer | Clean UX |
+| GUI (optional) | Streamlit / Tkinter | Later |
+
+---
+
+## 5. Project Structure
+
+umd/
+├── core/
+│ ├── extractor.py
+│ ├── resolver.py
+│ ├── downloader.py
+│ └── exceptions.py
+├── extractors/
+│ ├── instagram.py
+│ ├── facebook.py
+│ ├── linkedin.py
+│ ├── twitter.py
+│ └── generic.py
+├── utils/
+│ ├── user_agents.py
+│ ├── cookies.py
+│ └── logging.py
+├── cli.py
+├── config.yaml
+└── README.md
+
+
+---
+
+## 6. URL Classification
+
+```python
+import re
+
+PLATFORM_PATTERNS = {
+    "instagram": r"(instagram\.com)",
+    "facebook": r"(facebook\.com|fb\.watch)",
+    "linkedin": r"(linkedin\.com)",
+    "twitter": r"(twitter\.com|x\.com)",
+}
+
+def detect_platform(url: str) -> str:
+    for platform, pattern in PLATFORM_PATTERNS.items():
+        if re.search(pattern, url):
+            return platform
+    return "generic"
+7. Extractor Interface (CRITICAL)
+from abc import ABC, abstractmethod
+
+class BaseExtractor(ABC):
+    def __init__(self, url: str):
+        self.url = url
+
+    @abstractmethod
+    def extract(self) -> dict:
+        """
+        Must return:
+        {
+            "type": "mp4" | "hls",
+            "urls": [list of media URLs],
+            "title": str
+        }
+        """
+        pass
+8. Instagram Extractor (Reality-Based)
+Strategy (Public Content)
+Load page HTML
+
+Extract window._sharedData or JSON-LD
+
+Fallback to yt-dlp
+
+import subprocess
+import json
+
+class InstagramExtractor(BaseExtractor):
+    def extract(self):
+        cmd = [
+            "yt-dlp",
+            "-j",
+            self.url
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        data = json.loads(result.stdout)
+
+        return {
+            "type": "mp4",
+            "urls": [data["url"]],
+            "title": data.get("title", "instagram_video")
+        }
+⚠️ Blunt truth:
+Instagram scraping without yt-dlp is a waste of time.
+
+9. Carousel Handling (Non-Trivial)
+Instagram carousels return multiple media nodes.
+
+urls = []
+for entry in data.get("entries", []):
+    urls.append(entry["url"])
+Each URL must be downloaded separately.
+
+10. HLS Resolution (Twitter, LinkedIn)
+def download_hls(m3u8_url, output):
+    cmd = [
+        "ffmpeg",
+        "-i", m3u8_url,
+        "-c", "copy",
+        output
+    ]
+    subprocess.run(cmd)
+11. Downloader Engine
+import subprocess
+
+def download_file(url, filename):
+    cmd = [
+        "aria2c",
+        "-x", "16",
+        "-s", "16",
+        "-o", filename,
+        url
+    ]
+    subprocess.run(cmd)
+12. CLI Entry Point
+import typer
+from core.router import route
+
+app = typer.Typer()
+
+@app.command()
+def download(url: str):
+    route(url)
+
+if __name__ == "__main__":
+    app()
+13. Error Handling (Mandatory)
+Failure	Action
+Geo-block	Retry via proxy
+403	Rotate user-agent
+JS-only content	yt-dlp fallback
+DRM	Abort (cannot bypass legally)
+
+15. What Will Break (Guaranteed)
+
+Instagram weekly
+
+Facebook video endpoints
+
+Threads obfuscation
+
+LinkedIn signed URLs
+
+This is maintenance software, not a one-time script.
+
+16. Realistic Roadmap
+MVP (2 weeks)
+
+CLI
+
+yt-dlp integration
+
+Instagram + Facebook public
+
+v1.0
+
+Carousel
+
+HLS
+
+Filename metadata
+
+v2.0
+
+GUI
+
+Cookie-based auth
+
+Batch download
+
+All-in-One Video Downloader Blueprint
+Project Overview
+A cross-platform Python GUI application that downloads videos, reels, carousels, photos, and stories from social media platforms by simply pasting a URL. Supports Facebook, Instagram, Twitter/X, LinkedIn, TikTok, YouTube, and more.
+
+Table of Contents
+Features
+Tech Stack
+Project Structure
+Implementation Steps
+Code Snippets
+Error Handling
+Testing
+Features
+Multi-platform support: FB, IG, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest, etc.
+Multiple formats: Videos, photos, carousels, stories, reels
+Batch download: Queue multiple URLs
+Progress tracking: Real-time download progress
+Format selection: Auto-detect best quality or let user choose
+Clean filename generation: Platform-appropriate naming
+GUI interface: Simple paste-and-download UI
+Playlist/Thread support: Download entire threads/carousels
+Proxy support: For restricted content
+Tech Stack
+
+
+
+Core Dependencies:
+├── yt-dlp              # Main downloader (supports 1000+ sites)
+├── tkinter             # Native GUI (cross-platform)
+├── pillow              # Thumbnail preview
+├── requests            # Fallback HTTP requests
+├── threading           # Non-blocking downloads
+└── pathlib             # Modern file handling
+Project Structure
+
+
+
+video-downloader/
+├── main.py                 # Entry point & GUI
+├── downloader.py           # Core download logic
+├── config.py               # Settings & defaults
+├── ui/
+│   ├── __init__.py
+│   ├── main_window.py      # Main GUI
+│   └── progress_dialog.py  # Download progress
+├── utils/
+│   ├── __init__.py
+│   ├── file_naming.py      # Clean filenames
+│   └── thumbnail.py        # Preview generation
+├── requirements.txt
+├── README.md
+└── downloads/              # Output folder
+Implementation Steps
+1. Setup & Dependencies
+bash
+
+
+
+# requirements.txt
+yt-dlp==2024.10.22
+pillow==10.1.0
+requests==2.31.0
+tqdm==4.66.1
+2. Core Downloader Module (downloader.py)
+python
+
+
+
+import yt_dlp
+import os
+from pathlib import Path
+from typing import Optional, Dict, List
+import threading
+
+class VideoDownloader:
+    def __init__(self, output_dir: str = "downloads"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)
+        
+    def get_video_info(self, url: str) -> Optional[Dict]:
+        """Extract video metadata without downloading"""
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return {
+                    'title': info.get('title', 'Unknown'),
+                    'duration': info.get('duration', 0),
+                    'formats': info.get('formats', []),
+                    'thumbnail': info.get('thumbnail'),
+                    'uploader': info.get('uploader', '')
+                }
+        except Exception as e:
+            print(f"Error getting info: {e}")
+            return None
+    
+    def download_video(self, 
+                      url: str, 
+                      format_selector: str = 'best',
+                      progress_callback=None) -> Dict:
+        """Download video with progress callback"""
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                percent = d.get('_percent_str', '0%')
+                speed = d.get('_speed_str', '0')
+                if progress_callback:
+                    progress_callback({
+                        'status': 'downloading',
+                        'percent': percent,
+                        'speed': speed,
+                        'filename': d.get('filename', '')
+                    })
+            elif d['status'] == 'finished':
+                if progress_callback:
+                    progress_callback({
+                        'status': 'finished',
+                        'filename': d.get('filename', '')
+                    })
+        
+        ydl_opts = {
+            'outtmpl': str(self.output_dir / '%(platform)s/%(title)s.%(ext)s'),
+            'format': format_selector,
+            'progress_hooks': [progress_hook],
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                return {
+                    'success': True,
+                    'filename': ydl.prepare_filename(info),
+                    'title': info.get('title'),
+                    'duration': info.get('duration', 0)
+                }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+3. Main GUI Window (ui/main_window.py)
+python
+
+
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+from pathlib import Path
+from ..downloader import VideoDownloader
+
+class MainWindow:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("All-in-One Video Downloader")
+        self.root.geometry("800x600")
+        
+        self.downloader = VideoDownloader()
+        self.download_thread = None
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        # URL Input
+        url_frame = ttk.LabelFrame(self.root, text="Video URL", padding=10)
+        url_frame.pack(fill='x', padx=10, pady=5)
+        
+        self.url_entry = ttk.Entry(url_frame, font=('Arial', 12))
+        self.url_entry.pack(side='left', fill='x', expand=True, padx=(0,5))
+        self.url_entry.bind('<Control-v>', self.paste_url)
+        
+        ttk.Button(url_frame, text="📋 Paste", 
+                  command=self.paste_url).pack(side='right')
+        ttk.Button(url_frame, text="🔍 Preview", 
+                  command=self.preview_video).pack(side='right', padx=(5,0))
+        
+        # Download Controls
+        control_frame = ttk.Frame(self.root)
+        control_frame.pack(fill='x', padx=10, pady=5)
+        
+        self.format_var = tk.StringVar(value="best")
+        ttk.OptionMenu(control_frame, self.format_var, "best", 
+                      "best", "best[height<=720]", "worst").pack(side='left')
+        
+        ttk.Button(control_frame, text="⬇️ Download", 
+                  command=self.start_download).pack(side='right')
+        
+        # Progress & Queue
+        self.setup_progress_area()
+    
+    def paste_url(self, event=None):
+        try:
+            url = self.root.clipboard_get()
+            self.url_entry.delete(0, tk.END)
+            self.url_entry.insert(0, url)
+        except:
+            pass
+    
+    def preview_video(self):
+        url = self.url_entry.get().strip()
+        if not url:
+            messagebox.showwarning("Warning", "Please enter a URL")
+            return
+        
+        info = self.downloader.get_video_info(url)
+        if info:
+            preview = f"""
+📹 {info['title']}
+⏱️ {info['duration']}s
+👤 {info['uploader']}
+            """
+            messagebox.showinfo("Video Info", preview)
+        else:
+            messagebox.showerror("Error", "Could not fetch video info")
+4. Progress Tracking (ui/progress_dialog.py)
+python
+
+
+
+class ProgressDialog(tk.Toplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.title("Download Progress")
+        self.geometry("500x150")
+        self.transient(parent)
+        self.grab_set()
+        
+        self.callback = callback
+        self.progress = ttk.Progressbar(self, mode='indeterminate')
+        self.progress.pack(fill='x', padx=20, pady=10)
+        self.progress.start()
+        
+        self.status_label = ttk.Label(self, text="Starting download...")
+        self.status_label.pack(pady=5)
+        
+        self.percent_label = ttk.Label(self, text="")
+        self.percent_label.pack()
+5. File Naming Utils (utils/file_naming.py)
+python
+
+
+
+import re
+from pathlib import Path
+
+def sanitize_filename(filename: str) -> str:
+    """Remove invalid characters from filename"""
+    # Remove or replace invalid characters
+    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    filename = re.sub(r'\s+', ' ', filename).strip()
+    return filename[:200]  # Truncate if too long
+
+def get_platform_from_url(url: str) -> str:
+    """Detect platform from URL"""
+    platforms = {
+        'facebook.com': 'facebook',
+        'instagram.com': 'instagram', 
+        'twitter.com': 'twitter',
+        'x.com': 'twitter',
+        'linkedin.com': 'linkedin',
+        'tiktok.com': 'tiktok',
+        'youtube.com': 'youtube',
+        'pinterest.com': 'pinterest'
+    }
+    
+    for domain, platform in platforms.items():
+        if domain in url:
+            return platform
+    return 'unknown'
+Error Handling Strategy
+Network errors: Retry 3x with exponential backoff
+Private/age-restricted: Clear error message + login instructions
+Format errors: Fallback to worst quality
+Invalid URL: Validate URL format before attempting
+Disk space: Check available space before large downloads
+python
+
+
+
+# Example error handling in downloader
+def safe_download(self, url: str, max_retries: int = 3):
+    for attempt in range(max_retries):
+        try:
+            return self.download_video(url)
+        except yt_dlp.DownloadError as e:
+            if "Private" in str(e) or "age-restricted" in str(e):
+                return {'success': False, 'error': 'Private content - login required'}
+            if attempt == max_retries - 1:
+                return {'success': False, 'error': str(e)}
+            time.sleep(2 ** attempt)  # Exponential backoff
+Platform-Specific Notes
+
+
+Platform	Notes	Best Format Selector
+Instagram	Supports Reels/Carousels/Stories	best
+Facebook	Login may be needed for private	best[height<=720]
+Twitter/X	Thread support built-in	best
+TikTok	Works without account	best
+LinkedIn	May require cookies	worst (most reliable)
+Testing Checklist
+ Single video download (YouTube)
+ Instagram Reel
+ Facebook video (public/private)
+ Twitter thread
+ Batch download 5+ URLs
+ Large file (>1GB)
+ Network interruption recovery
+ Invalid URL handling
+ Cross-platform (Win/Mac/Linux)
+Next Steps for Developer
+Implement main.py entry point
+Add download queue system
+Implement thumbnail preview
+Add settings dialog (output dir, proxy, quality)
+Package as executable (PyInstaller)
+Add auto-update for yt-dlp
+Quick Start
+bash
+
+
+
+pip install -r requirements.txt
+python main.py
+Pro Tip: Run yt-dlp --update regularly to support new sites/formats automatically!**
