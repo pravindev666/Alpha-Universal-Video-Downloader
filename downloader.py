@@ -50,9 +50,16 @@ class VideoDownloader:
         # 1. Deep clean: Remove ALL whitespace types (including hidden ones)
         url = re.sub(r'\s+', '', url)
         
-        # 2. YouTube Cleanup (Strip tracking/SI parameters)
+        # 2. YouTube Cleanup (Strip tracking/SI parameters & Normalize youtu.be)
         if 'youtube.com' in url or 'youtu.be' in url:
+            # Strip SI tracking
             url = re.sub(r'[?&]si=[^&]*', '', url)
+            # Normalize youtu.be/ID to youtube.com/watch?v=ID (More robust for some IPs)
+            if 'youtu.be/' in url:
+                match = re.search(r'youtu\.be/([^/?#\s]+)', url)
+                if match:
+                    video_id = match.group(1)
+                    url = f"https://www.youtube.com/watch?v={video_id}"
         
         # 3. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
         if not url.startswith('http') and not url.startswith('instagram:'):
@@ -99,11 +106,11 @@ class VideoDownloader:
             'referer': 'https://www.google.com/',
             'socket_timeout': 30,
             'retries': 20,
-            'source_address': '0.0.0.0', # Helps with some IPv6/v4 cloud issues
             'cachedir': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': 'android,web_creator', # Multi-client fallback
+                    'player_client': 'android,web', # The most stable combination
+                    'player_skip': 'webpage,configs,js', # Restore speed
                     'include_ssl_logs': False
                 }
             }
