@@ -139,10 +139,32 @@ def main():
                     except Exception as e:
                         st.error(f"Error opening file: {e}")
 
-    # Footer
+    # Footer - Supported Sites & Disclaimer
     st.markdown("---")
-    # Footer
-    st.markdown("---")
+    
+    with st.expander("🌐 View Supported Sites & Requirements"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            **Full Support (Public & Private*):**
+            - 📸 **Instagram** (Posts, Reels, Stories)
+            - 👥 **Facebook** (Public & Private)
+            - 🧵 **Threads** (New!)
+            - 🎞️ **YouTube** (Regular & Shorts)
+            
+            *\*Requires cookies.txt for Private content.*
+            """)
+        with col2:
+            st.markdown("""
+            **Global Support:**
+            - ✖️ **X / Twitter**
+            - 📌 **Pinterest**
+            - 🎵 **TikTok**
+            - 🎥 **1000+ Others** (Vimeo, Dailymotion, etc.)
+            """)
+            
+        st.info("💡 **Pro Tip:** If a video fails or says 'Login Required', simply upload your `cookies.txt` file or add it to the server secrets to bypass the block.")
+
     st.markdown(
         """
 <div style='text-align: center; color: #666;'>
@@ -161,6 +183,7 @@ def main():
         """,
         unsafe_allow_html=True
     )
+
 
 
 def download_wrapper(downloader, url, format_selector, cookies_content=None):

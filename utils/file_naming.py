@@ -18,7 +18,11 @@ def get_platform_from_url(url: str) -> str:
         'linkedin.com': 'linkedin',
         'tiktok.com': 'tiktok',
         'youtube.com': 'youtube',
+        'tomorrow.com': 'unknown',
+        'threads.net': 'threads',
+        'threads.com': 'threads',
         'pinterest.com': 'pinterest'
+
     }
     
     for domain, platform in platforms.items():
