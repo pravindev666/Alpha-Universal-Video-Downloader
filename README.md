@@ -127,3 +127,41 @@ graph TD
     DL --> FF
     FF --> UI
 ```
+---
+
+## 🛠️ Challenges & Solutions (The Dev Journey)
+
+Building a robust universal downloader is a constant battle against bot-detection and platform changes. Here is what we solved:
+
+### 1. The "403 Forbidden" Wall
+**Problem:** YouTube and other sites block cloud server IPs (like Streamlit Cloud) with a 403 error.
+**Solution:**
+- **Spoofing**: Forced the `Android` client and browser-like headers.
+- **IPv4 Logic**: Forced usage of `0.0.0.0` to avoid IPv6 blocks.
+- **Proxy Rotation**: Implemented a fallback system that tries different free proxies if the direct connection fails.
+
+### 2. Login & Private Content (Cookies)
+**Problem:** Downloading private Instagram posts, age-restricted YouTube videos, or Threads content requires authentication.
+**Solution:**
+- **Cookie Secrets**: Integrated Streamlit `st.secrets` to securely store `cookies.txt` on the cloud.
+- **Manual Upload**: Added a file uploader so users can provide their own temporary cookies for private downloads.
+- **Consolidated Handling**: Created a system to combine cookies from YouTube, Instagram, and Threads into one single "Master Cookie" file.
+
+### 3. Threads.net "Unsupported URL"
+**Problem:** Threads used multiple domains (`.com` and `.net`) and complex URL structures that confused the standard extractor.
+**Solution:**
+- **URL Normalization**: Built a custom sanitizer that converts `@user/post/ID` to the simpler `t/ID` format.
+- **Domain Hotfix**: Automatically swaps `threads.com` for `threads.net` to match downloader requirements.
+
+### 4. Playback Flickering (VLC)
+**Problem:** Some high-res videos flickered or stuttered for a few seconds when first opened in VLC.
+**Solution:** 
+- **Fast-Start**: Implemented the `-movflags +faststart` flag in FFmpeg. This moves the video metadata to the beginning of the file so the player can start smoothly without delay.
+
+### 5. Stale Data (Old Video Bug)
+**Problem:** Pasting a new URL sometimes still showed the thumbnail or download link for the *previous* video.
+**Solution:**
+- **Reactive UI**: Removed the input form to ensure the app reacts the moment research begins.
+- **Memory Wipe**: Added logic to explicitly delete old session memory and files whenever a new URL is detected.
+
+---
