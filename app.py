@@ -34,6 +34,7 @@ def main():
 
     # Detect URL change and wipe old state immediately
     if url != st.session_state['last_url']:
+        print(f"DEBUG: URL Input changed to: '{url}'")
         for key in ['video_info', 'last_file']:
             if key in st.session_state: del st.session_state[key]
         st.session_state['last_url'] = url

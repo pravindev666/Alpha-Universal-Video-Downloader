@@ -52,21 +52,24 @@ class VideoDownloader:
         return None
 
     def _sanitize_url(self, url: str) -> str:
-        """Clean URL and handle domain hotfixes"""
-        # Remove ALL whitespace characters (including non-breaking spaces, tabs, etc.)
+        """Clean URL, handle partial paths, and normalize domains"""
+        # 1. Strip all whitespace (internal and external)
         url = re.sub(r'\s+', '', url)
         
-        # Threads partial hotfix: If user pated "t/ID" or "post/ID", prepend domain
-        if url.startswith('t/') or url.startswith('post/'):
-             url = "https://www.threads.net/" + url
-        elif '@' in url and '/post/' in url and not url.startswith('http'):
-             url = "https://www.threads.net/" + url
-
-        # Threads domain hotfix
+        # 2. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
+        if not url.startswith('http'):
+            # Remove leading slash for consistency
+            clean_path = url.lstrip('/')
+            if clean_path.startswith('t/') or clean_path.startswith('post/'):
+                url = f"https://www.threads.net/{clean_path}"
+            elif '/' not in clean_path and len(clean_path) > 5: # Likely a post ID
+                url = f"https://www.threads.net/t/{clean_path}"
+        
+        # 3. Domain Normalization (Force .net for yt-dlp compatibility)
         if 'threads.com' in url:
             url = url.replace('threads.com', 'threads.net')
         
-        # Threads format normalization: @user/post/ID -> t/ID (Better for generic extraction)
+        # 4. Path Normalization (@user/post/ID -> t/ID)
         if 'threads.net/@' in url and '/post/' in url:
             match = re.search(r'/post/([^/?#\s]+)', url)
             if match:
@@ -76,7 +79,7 @@ class VideoDownloader:
         return url
 
     def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
-        """Extract video metadata using robust anti-bot settings, optional cookies, and proxy fallback"""
+        """Extract video metadata with robust fallbacks"""
         url = self._sanitize_url(url)
         print(f"DEBUG: Processing sanitized URL: {url}")
         
