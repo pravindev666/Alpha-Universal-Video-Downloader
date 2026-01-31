@@ -12,13 +12,6 @@ PROXIES = [
     'http://20.206.106.192:80',
 ]
 
-import re
-try:
-    from yt_dlp.extractor.instagram import InstagramIE
-    # Monkeypatch to support Threads URLs via Instagram extractor
-    InstagramIE._VALID_URL = r'(?P<url>https?://(?:www\.)?(?:instagram\.com|threads\.net|threads\.com)(?:/(?!share/)[^/?#]+)?/(?:p|tv|reels?|post|t(?!/audio/))/(?P<id>[^/?#&]+))'
-except ImportError:
-    pass
 
 class VideoDownloader:
     def __init__(self, output_dir: str = "downloads"):
@@ -57,7 +50,11 @@ class VideoDownloader:
         # 1. Deep clean: Remove ALL whitespace types (including hidden ones)
         url = re.sub(r'\s+', '', url)
         
-        # 2. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
+        # 2. YouTube Cleanup (Strip tracking/SI parameters)
+        if 'youtube.com' in url or 'youtu.be' in url:
+            url = re.sub(r'[?&]si=[^&]*', '', url)
+        
+        # 3. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
         if not url.startswith('http') and not url.startswith('instagram:'):
             clean_path = url.lstrip('/')
             if clean_path.startswith('t/') or clean_path.startswith('post/'):
@@ -65,11 +62,11 @@ class VideoDownloader:
             elif '/' not in clean_path and len(clean_path) > 5: # Likely a post ID
                 url = f"https://www.threads.net/t/{clean_path}"
         
-        # 3. Domain Normalization (Force .net for yt-dlp compatibility)
+        # 4. Domain Normalization (Force .net for yt-dlp compatibility)
         if 'threads.com' in url:
             url = url.replace('threads.com', 'threads.net')
         
-        # 4. Path Normalization (@user/post/ID -> t/ID)
+        # 5. Path Normalization (@user/post/ID -> t/ID)
         if 'threads.net/@' in url and '/post/' in url:
             match = re.search(r'/post/([^/?#\s]+)', url)
             if match:
@@ -89,10 +86,10 @@ class VideoDownloader:
             fd, cookie_file = tempfile.mkstemp(suffix='.txt', text=True)
             with os.fdopen(fd, 'w') as f:
                 f.write(cookies_content)
-
+ 
         # Base options
         base_opts = {
-            'quiet': True,
+            'quiet': True, 
             'no_warnings': True,
             'nocheckcertificate': True,
             'ignoreerrors': False,
@@ -103,13 +100,7 @@ class VideoDownloader:
             'retries': 20,
             'source_address': '0.0.0.0',
             'cachedir': False,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': 'android',
-                    'player_skip': 'webpage,configs,js',
-                    'include_ssl_logs': False
-                }
-            }
+            # We removed the restrictive 'player_skip' as it blocks formats now
         }
         
         if cookie_file:
