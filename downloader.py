@@ -43,8 +43,26 @@ class VideoDownloader:
                 continue
         return None
 
+    def _sanitize_url(self, url: str) -> str:
+        """Clean URL and handle domain hotfixes"""
+        url = url.strip()
+        # Threads hotfix: Meta acquired threads.com, but yt-dlp might only match threads.net
+        if 'threads.com' in url:
+            url = url.replace('threads.com', 'threads.net')
+        
+        # Threads format normalization: @user/post/ID -> t/ID (Better for generic extraction)
+        if 'threads.net/@' in url and '/post/' in url:
+            import re
+            match = re.search(r'/post/([^/?#\s]+)', url)
+            if match:
+                post_id = match.group(1)
+                url = f"https://www.threads.net/t/{post_id}"
+                
+        return url
+
     def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
         """Extract video metadata using robust anti-bot settings, optional cookies, and proxy fallback"""
+        url = self._sanitize_url(url)
         
         cookie_file = None
         if cookies_content:
@@ -164,6 +182,7 @@ class VideoDownloader:
                       progress_callback=None,
                       cookies_content: str = None) -> Dict:
         """Download video with robust fallback strategy and proxies"""
+        url = self._sanitize_url(url)
         
         cookie_file = None
         if cookies_content:

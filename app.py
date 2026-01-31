@@ -18,7 +18,7 @@ def main():
     with st.form(key='url_form'):
         c1, c2 = st.columns([4, 1])
         with c1:
-            url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible")
+            url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible").strip()
         with c2:
             st.write("") # Spacer for alignment
             st.write("")
