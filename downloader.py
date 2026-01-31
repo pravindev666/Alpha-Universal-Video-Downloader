@@ -94,13 +94,19 @@ class VideoDownloader:
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # Modern Chrome User Agent
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
             'socket_timeout': 30,
             'retries': 20,
-            'source_address': '0.0.0.0',
+            'source_address': '0.0.0.0', # Helps with some IPv6/v4 cloud issues
             'cachedir': False,
-            # We removed the restrictive 'player_skip' as it blocks formats now
+            'extractor_args': {
+                'youtube': {
+                    'player_client': 'android,web_creator', # Multi-client fallback
+                    'include_ssl_logs': False
+                }
+            }
         }
         
         if cookie_file:
