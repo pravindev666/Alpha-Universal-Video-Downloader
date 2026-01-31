@@ -2,14 +2,23 @@ import yt_dlp
 import os
 import tempfile
 import requests
+import random
 from pathlib import Path
 from typing import Optional, Dict, List
 
-# Free proxies provided by user (Auto-rotation)
-PROXIES = [
-    'http://103.153.39.19:80',
-    'http://47.74.135.104:8888',
-    'http://20.206.106.192:80',
+# Webshare Residential Proxies (Authenticated)
+# Format: http://username:password@ip:port
+RESIDENTIAL_PROXIES = [
+    'http://iklvqron:pwpu673kzke3@23.95.150.145:6114',
+    'http://iklvqron:pwpu673kzke3@198.23.239.134:6540',
+    'http://iklvqron:pwpu673kzke3@107.172.163.27:6543',
+    'http://iklvqron:pwpu673kzke3@198.105.121.200:6462',
+    'http://iklvqron:pwpu673kzke3@64.137.96.74:6641',
+    'http://iklvqron:pwpu673kzke3@216.10.27.159:6837',
+    'http://iklvqron:pwpu673kzke3@23.26.71.145:5628',
+    'http://iklvqron:pwpu673kzke3@23.27.208.120:5830',
+    'http://iklvqron:pwpu673kzke3@23.229.19.94:8689',
+    'http://iklvqron:pwpu673kzke3@2.57.20.2:5994',
 ]
 
 
@@ -32,15 +41,22 @@ class VideoDownloader:
         return f"{size:.1f}{power_labels[n]}B"
 
     def _get_working_proxy(self):
-        """Find a working proxy from the list"""
-        print("Searching for working proxy...")
-        for proxy in PROXIES:
+        """Get a random working residential proxy"""
+        print("Selecting residential proxy...")
+        # Shuffle to distribute load
+        proxies = RESIDENTIAL_PROXIES.copy()
+        random.shuffle(proxies)
+        
+        for proxy in proxies:
             try:
-                # Test connectivity to YouTube
-                requests.get('https://www.youtube.com', proxies={'http': proxy, 'https': proxy}, timeout=3)
-                print(f"Found working proxy: {proxy}")
+                # Quick connectivity test
+                requests.get('https://www.youtube.com', 
+                           proxies={'http': proxy, 'https': proxy}, 
+                           timeout=5)
+                print(f"Using proxy: {proxy.split('@')[1]}")  # Log without credentials
                 return proxy
-            except:
+            except Exception as e:
+                print(f"Proxy failed: {str(e)[:50]}")
                 continue
         return None
 
@@ -123,6 +139,14 @@ class VideoDownloader:
         base_opts['geo_bypass'] = True
         base_opts['source_address'] = '0.0.0.0'  # Force IPv4
 
+        # For YouTube on cloud: Use residential proxy from the START
+        is_youtube = 'youtube.com' in url or 'youtu.be' in url
+        if is_youtube:
+            proxy = self._get_working_proxy()
+            if proxy:
+                base_opts['proxy'] = proxy
+                print(f"YouTube detected: Using residential proxy")
+
         try:
             # YouTube specific "Brute Force" Retry Strategy (ENHANCED for Cloud)
             # We try different "extractor_args" configurations until one sticks
@@ -140,7 +164,7 @@ class VideoDownloader:
             last_error = "Unknown error"
             
             # If not YouTube, just use basic opts once
-            if 'youtube.com' not in url and 'youtu.be' not in url:
+            if not is_youtube:
                 try:
                     with yt_dlp.YoutubeDL(base_opts) as ydl:
                         info = ydl.extract_info(url, download=False)
