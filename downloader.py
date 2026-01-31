@@ -243,7 +243,7 @@ class VideoDownloader:
 
     def _get_download_opts(self, fmt, hook, cookie_file, proxy):
         opts = {
-            'outtmpl': str(self.output_dir / '%(title)s.%(ext)s'),
+            'outtmpl': str(self.output_dir / '%(title)s_%(id)s.%(ext)s'),
             'progress_hooks': [hook],
             'restrictfilenames': True,
             'merge_output_format': 'mp4',

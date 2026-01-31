@@ -14,15 +14,20 @@ def main():
     # Initialize downloader
     downloader = VideoDownloader()
 
-    # URL Input Form
-    with st.form(key='url_form'):
-        c1, c2 = st.columns([4, 1])
-        with c1:
-            url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible").strip()
-        with c2:
-            st.write("") # Spacer for alignment
-            st.write("")
-            submit_btn = st.form_submit_button("🔍 Preview")
+    # URL Input (Removed form for reactivity)
+    c1, c2 = st.columns([4, 1])
+    with c1:
+        url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible").strip()
+    with c2:
+        st.write("") # Spacer
+        st.write("")
+        submit_btn = st.button("🔍 Preview", type="secondary")
+            
+    # CRITICAL: Clear session if URL changes to avoid "ghost" metadata
+    if url != st.session_state.get('last_url'):
+        if 'video_info' in st.session_state: del st.session_state['video_info']
+        if 'last_file' in st.session_state: del st.session_state['last_file']
+        st.session_state['last_url'] = url
             
     # Logic handles 'url' variable which is updated upon form submission
 
@@ -54,7 +59,8 @@ def main():
             pass
 
     if url:
-        if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
+        # Auto-fetch if info is missing or URL changed
+        if 'video_info' not in st.session_state:
             with st.spinner("Fetching video info..."):
                 # Handle cookies: User Upload > Server Default > None
                 user_cookies = cookies.getvalue().decode("utf-8") if cookies else None
