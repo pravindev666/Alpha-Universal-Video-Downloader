@@ -1,8 +1,11 @@
-import yt_dlp
-import os
-import tempfile
-from pathlib import Path
-from typing import Optional, Dict, List
+import requests
+
+# Free proxies provided by user (Auto-rotation)
+PROXIES = [
+    'http://103.153.39.19:80',
+    'http://47.74.135.104:8888',
+    'http://20.206.106.192:80',
+]
 
 class VideoDownloader:
     def __init__(self, output_dir: str = "downloads"):
@@ -22,29 +25,41 @@ class VideoDownloader:
             n += 1
         return f"{size:.1f}{power_labels[n]}B"
 
+    def _get_working_proxy(self):
+        """Find a working proxy from the list"""
+        print("Searching for working proxy...")
+        for proxy in PROXIES:
+            try:
+                # Test connectivity to YouTube
+                requests.get('https://www.youtube.com', proxies={'http': proxy, 'https': proxy}, timeout=3)
+                print(f"Found working proxy: {proxy}")
+                return proxy
+            except:
+                continue
+        return None
+
     def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
-        """Extract video metadata using robust anti-bot settings and optional cookies"""
+        """Extract video metadata using robust anti-bot settings, optional cookies, and proxy fallback"""
         
         cookie_file = None
         if cookies_content:
-            # Create a temporary cookie file
             fd, cookie_file = tempfile.mkstemp(suffix='.txt', text=True)
             with os.fdopen(fd, 'w') as f:
                 f.write(cookies_content)
 
-        self.ydl_opts_base = {
+        # Base options
+        base_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            # Anti-bot options (Force IPv4 + Android)
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
             'socket_timeout': 30,
             'retries': 20,
-            'source_address': '0.0.0.0', # Force IPv4 which is often less blocked than IPv6
-            'cachedir': False, # Disable cache to prevent stale 403s
+            'source_address': '0.0.0.0',
+            'cachedir': False,
             'extractor_args': {
                 'youtube': {
                     'player_client': 'android',
@@ -54,88 +69,96 @@ class VideoDownloader:
             }
         }
         
+        if cookie_file:
+            base_opts['cookiefile'] = cookie_file
+
+        # Strategy 1: Direct Connection
         try:
-            with yt_dlp.YoutubeDL(self.ydl_opts_base) as ydl:
+            with yt_dlp.YoutubeDL(base_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                
-                # Process formats
-                formats_summary = []
-                seen_resolutions = set()
-                
-                # audio size estimate (take the best audio)
-                best_audio_size = 0
-                for f in info.get('formats', []):
-                    if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
-                         # It's audio only
-                         size = f.get('filesize') or f.get('filesize_approx') or 0
-                         if size > best_audio_size:
-                             best_audio_size = size
-
-                # Video formats
-                for f in info.get('formats', []):
-                    # Skip audio-only or video-only if we serve mixed, but usually we want to see available resolutions
-                    height = f.get('height')
-                    if not height: continue
-                    
-                    if height not in seen_resolutions:
-                        seen_resolutions.add(height)
-                        # Estimate size: video stream + audio stream
-                        v_size = f.get('filesize') or f.get('filesize_approx') or 0
-                        total_estimate = v_size + best_audio_size if v_size else 0
-                        
-                        # Determine ext (default to mp4 if we merge)
-                        ext = 'mp4' 
-                        
-                        formats_summary.append({
-                            'label': f"{height}p",
-                            'size': total_estimate,
-                            'height': height,
-                            'type': 'video',
-                            'ext': ext
-                        })
-                
-                # Sort by resolution desc
-                formats_summary.sort(key=lambda x: x['height'], reverse=True)
-                
-                # Add human readable strings
-                options = []
-                for fmt in formats_summary:
-                    size_str = self._format_bytes(fmt['size'])
-                    options.append({
-                        'label': f"Video: {fmt['label']} - {fmt['ext'].upper()} (~{size_str})",
-                        'id': f"bestvideo[height={fmt['height']}]+bestaudio/best[height={fmt['height']}]",
-                        'type': 'video'
-                    })
-                
-                # Add Audio Only option
-                audio_size_str = self._format_bytes(best_audio_size)
-                options.append({
-                    'label': f"Audio Only - MP3 (~{audio_size_str})",
-                    'id': 'audio_only',
-                    'type': 'audio'
-                })
-
-                return {
-                    'title': info.get('title', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'thumbnail': info.get('thumbnail'),
-                    'uploader': info.get('uploader', ''),
-                    'quality_options': options
-                }
+                return self._process_info(info)
         except Exception as e:
-            print(f"Error getting info: {e}")
+            print(f"Direct fetch failed: {e}")
+            
+            # Strategy 2: Try Proxy
+            proxy = self._get_working_proxy()
+            if proxy:
+                print(f"Retrying with proxy: {proxy}")
+                base_opts['proxy'] = proxy
+                try:
+                    with yt_dlp.YoutubeDL(base_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        return self._process_info(info)
+                except Exception as proxy_e:
+                     print(f"Proxy fetch failed: {proxy_e}")
+                     return {'error': f"Direct & Proxy failed. Last error: {str(proxy_e)}"}
+            
             return {'error': str(e)}
         finally:
-            # Cleanup cookie file
             if cookie_file and os.path.exists(cookie_file):
                 os.remove(cookie_file)
+
+    def _process_info(self, info):
+        """Helper to process raw info into app format"""
+        formats_summary = []
+        seen_resolutions = set()
+        best_audio_size = 0
+        
+        for f in info.get('formats', []):
+            if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
+                    size = f.get('filesize') or f.get('filesize_approx') or 0
+                    if size > best_audio_size:
+                        best_audio_size = size
+
+        for f in info.get('formats', []):
+            height = f.get('height')
+            if not height: continue
+            
+            if height not in seen_resolutions:
+                seen_resolutions.add(height)
+                v_size = f.get('filesize') or f.get('filesize_approx') or 0
+                total_estimate = v_size + best_audio_size if v_size else 0
+                ext = 'mp4' 
+                formats_summary.append({
+                    'label': f"{height}p",
+                    'size': total_estimate,
+                    'height': height,
+                    'type': 'video',
+                    'ext': ext
+                })
+        
+        formats_summary.sort(key=lambda x: x['height'], reverse=True)
+        
+        options = []
+        for fmt in formats_summary:
+            size_str = self._format_bytes(fmt['size'])
+            options.append({
+                'label': f"Video: {fmt['label']} - {fmt['ext'].upper()} (~{size_str})",
+                'id': f"bestvideo[height={fmt['height']}]+bestaudio/best[height={fmt['height']}]",
+                'type': 'video'
+            })
+        
+        audio_size_str = self._format_bytes(best_audio_size)
+        options.append({
+            'label': f"Audio Only - MP3 (~{audio_size_str})",
+            'id': 'audio_only',
+            'type': 'audio'
+        })
+
+        return {
+            'title': info.get('title', 'Unknown'),
+            'duration': info.get('duration', 0),
+            'thumbnail': info.get('thumbnail'),
+            'uploader': info.get('uploader', ''),
+            'quality_options': options
+        }
     
     def download_video(self, 
                       url: str, 
                       format_selector: str = 'best',
                       progress_callback=None,
                       cookies_content: str = None) -> Dict:
-        """Download video with robust fallback strategy"""
+        """Download video with robust fallback strategy and proxies"""
         
         cookie_file = None
         if cookies_content:
@@ -161,81 +184,74 @@ class VideoDownloader:
                         'filename': d.get('filename', '')
                     })
 
-        # Define a strategy: Try requested format first, then fallbacks
         strategies = [format_selector]
-        
-        # Only add fallbacks if we are not in audio_only mode (audio usually just works)
         if format_selector != 'audio_only':
-            strategies.extend([
-                'best[ext=mp4]',           # Best MP4
-                'best[height<=720]',       # Safe HD
-                'best',                    # Anything
-                'worst[ext=mp4]'           # Emergency low quality
-            ])
+            strategies.extend(['best[ext=mp4]', 'best[height<=720]', 'best', 'worst[ext=mp4]'])
 
         last_error = None
         
+        # Try strategies (Direct)
         for fmt in strategies:
-            # Prepare options for this attempt
-            ydl_opts = {
-                'outtmpl': str(self.output_dir / '%(title)s.%(ext)s'),
-                'progress_hooks': [progress_hook],
-                'restrictfilenames': True,
-                'merge_output_format': 'mp4',
-                'ffmpeg_location': self.ffmpeg_location,
-                # Use standard Android client
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': 'android',
-                        'player_skip': 'webpage,configs,js',
-                        'include_ssl_logs': False
-                    }
-                }
-            }
-            
-            if cookie_file:
-                ydl_opts['cookiefile'] = cookie_file
-
-            # Configure format
-            if fmt == 'audio_only':
-                ydl_opts.update({
-                    'format': 'bestaudio/best',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }],
-                })
-            else:
-                ydl_opts['format'] = fmt
-
+            ydl_opts = self._get_download_opts(fmt, progress_hook, cookie_file, None)
             try:
-                # print(f"Trying format: {fmt}") 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     filename = ydl.prepare_filename(info)
-                    
-                    if fmt == 'audio_only':
-                        filename = str(Path(filename).with_suffix('.mp3'))
-                        
-                    return {
-                        'success': True,
-                        'filename': filename,
-                        'title': info.get('title'),
-                        'duration': info.get('duration', 0)
-                    }
+                    return self._success_result(filename, info, format_selector)
             except Exception as e:
-                # print(f"Format {fmt} failed: {e}")
                 last_error = str(e)
-                # If audio only fails, it likely won't work with other video formats if it's a network/cookie issue,
-                # but we continue anyway just in case.
                 continue
         
-        # If all strategies failed
-        return {'success': False, 'error': f"All attempts failed. Last error: {last_error}"}
-        
-        if cookie_file and os.path.exists(cookie_file):
+        # If direct failed: Try Proxy with best strategy only (to save time)
+        print("Direct download failed. Trying proxies...")
+        proxy = self._get_working_proxy()
+        if proxy:
+            ydl_opts = self._get_download_opts(format_selector, progress_hook, cookie_file, proxy) # Try requested format first
             try:
-                os.remove(cookie_file)
-            except:
-                pass
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    filename = ydl.prepare_filename(info)
+                    return self._success_result(filename, info, format_selector)
+            except Exception as e:
+                return {'success': False, 'error': f"Proxy failed: {e}"}
+
+        return {'success': False, 'error': f"All attempts failed. Last error: {last_error}"}
+
+    def _get_download_opts(self, fmt, hook, cookie_file, proxy):
+        opts = {
+            'outtmpl': str(self.output_dir / '%(title)s.%(ext)s'),
+            'progress_hooks': [hook],
+            'restrictfilenames': True,
+            'merge_output_format': 'mp4',
+            'ffmpeg_location': self.ffmpeg_location,
+            'source_address': '0.0.0.0',
+            'extractor_args': {
+                'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js', 'include_ssl_logs': False}
+            }
+        }
+        if fmt == 'audio_only':
+            opts.update({
+                'format': 'bestaudio/best',
+                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+            })
+        else:
+            opts['format'] = fmt
+            
+        if cookie_file: opts['cookiefile'] = cookie_file
+        if proxy: opts['proxy'] = proxy
+        return opts
+
+    def _success_result(self, filename, info, fmt):
+        if fmt == 'audio_only':
+            filename = str(Path(filename).with_suffix('.mp3'))
+        return {
+            'success': True,
+            'filename': filename,
+            'title': info.get('title'),
+            'duration': info.get('duration', 0)
+        }
+        
+    def _cleanup(self, cookie_file):
+         if cookie_file and os.path.exists(cookie_file):
+            try: os.remove(cookie_file)
+            except: pass
