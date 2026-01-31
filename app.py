@@ -15,8 +15,17 @@ def main():
     # Initialize downloader
     downloader = VideoDownloader()
 
-    # URL Input
-    url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...")
+    # URL Input Form
+    with st.form(key='url_form'):
+        c1, c2 = st.columns([4, 1])
+        with c1:
+            url = st.text_input("Paste Video URL:", placeholder="https://www.youtube.com/watch?v=...", label_visibility="visible")
+        with c2:
+            st.write("") # Spacer for alignment
+            st.write("")
+            submit_btn = st.form_submit_button("🔍 Preview")
+            
+    # Logic handles 'url' variable which is updated upon form submission
 
     if url:
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
