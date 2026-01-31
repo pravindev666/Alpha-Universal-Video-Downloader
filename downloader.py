@@ -2,25 +2,23 @@ import yt_dlp
 import os
 import tempfile
 import requests
-import random
 from pathlib import Path
 from typing import Optional, Dict, List
 
-# Webshare Residential Proxies (Authenticated)
-# Format: http://username:password@ip:port
-RESIDENTIAL_PROXIES = [
-    'http://iklvqron:pwpu673kzke3@23.95.150.145:6114',
-    'http://iklvqron:pwpu673kzke3@198.23.239.134:6540',
-    'http://iklvqron:pwpu673kzke3@107.172.163.27:6543',
-    'http://iklvqron:pwpu673kzke3@198.105.121.200:6462',
-    'http://iklvqron:pwpu673kzke3@64.137.96.74:6641',
-    'http://iklvqron:pwpu673kzke3@216.10.27.159:6837',
-    'http://iklvqron:pwpu673kzke3@23.26.71.145:5628',
-    'http://iklvqron:pwpu673kzke3@23.27.208.120:5830',
-    'http://iklvqron:pwpu673kzke3@23.229.19.94:8689',
-    'http://iklvqron:pwpu673kzke3@2.57.20.2:5994',
+# Free proxies provided by user (Auto-rotation)
+PROXIES = [
+    'http://103.153.39.19:80',
+    'http://47.74.135.104:8888',
+    'http://20.206.106.192:80',
 ]
 
+import re
+try:
+    from yt_dlp.extractor.instagram import InstagramIE
+    # Monkeypatch to support Threads URLs via Instagram extractor
+    InstagramIE._VALID_URL = r'(?P<url>https?://(?:www\.)?(?:instagram\.com|threads\.net|threads\.com)(?:/(?!share/)[^/?#]+)?/(?:p|tv|reels?|post|t(?!/audio/))/(?P<id>[^/?#&]+))'
+except ImportError:
+    pass
 
 class VideoDownloader:
     def __init__(self, output_dir: str = "downloads"):
@@ -41,22 +39,15 @@ class VideoDownloader:
         return f"{size:.1f}{power_labels[n]}B"
 
     def _get_working_proxy(self):
-        """Get a random working residential proxy"""
-        print("Selecting residential proxy...")
-        # Shuffle to distribute load
-        proxies = RESIDENTIAL_PROXIES.copy()
-        random.shuffle(proxies)
-        
-        for proxy in proxies:
+        """Find a working proxy from the list"""
+        print("Searching for working proxy...")
+        for proxy in PROXIES:
             try:
-                # Quick connectivity test
-                requests.get('https://www.youtube.com', 
-                           proxies={'http': proxy, 'https': proxy}, 
-                           timeout=5)
-                print(f"Using proxy: {proxy.split('@')[1]}")  # Log without credentials
+                # Test connectivity to YouTube
+                requests.get('https://www.youtube.com', proxies={'http': proxy, 'https': proxy}, timeout=3)
+                print(f"Found working proxy: {proxy}")
                 return proxy
-            except Exception as e:
-                print(f"Proxy failed: {str(e)[:50]}")
+            except:
                 continue
         return None
 
@@ -66,18 +57,7 @@ class VideoDownloader:
         # 1. Deep clean: Remove ALL whitespace types (including hidden ones)
         url = re.sub(r'\s+', '', url)
         
-        # 2. YouTube Cleanup (Strip tracking/SI parameters & Normalize youtu.be)
-        if 'youtube.com' in url or 'youtu.be' in url:
-            # Strip SI tracking
-            url = re.sub(r'[?&]si=[^&]*', '', url)
-            # Normalize youtu.be/ID to youtube.com/watch?v=ID (More robust for some IPs)
-            if 'youtu.be/' in url:
-                match = re.search(r'youtu\.be/([^/?#\s]+)', url)
-                if match:
-                    video_id = match.group(1)
-                    url = f"https://www.youtube.com/watch?v={video_id}"
-        
-        # 3. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
+        # 2. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
         if not url.startswith('http') and not url.startswith('instagram:'):
             clean_path = url.lstrip('/')
             if clean_path.startswith('t/') or clean_path.startswith('post/'):
@@ -85,11 +65,11 @@ class VideoDownloader:
             elif '/' not in clean_path and len(clean_path) > 5: # Likely a post ID
                 url = f"https://www.threads.net/t/{clean_path}"
         
-        # 4. Domain Normalization (Force .net for yt-dlp compatibility)
+        # 3. Domain Normalization (Force .net for yt-dlp compatibility)
         if 'threads.com' in url:
             url = url.replace('threads.com', 'threads.net')
         
-        # 5. Path Normalization (@user/post/ID -> t/ID)
+        # 4. Path Normalization (@user/post/ID -> t/ID)
         if 'threads.net/@' in url and '/post/' in url:
             match = re.search(r'/post/([^/?#\s]+)', url)
             if match:
@@ -109,24 +89,24 @@ class VideoDownloader:
             fd, cookie_file = tempfile.mkstemp(suffix='.txt', text=True)
             with os.fdopen(fd, 'w') as f:
                 f.write(cookies_content)
- 
+
         # Base options
         base_opts = {
-            'quiet': True, 
+            'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            # Modern Chrome User Agent
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
             'socket_timeout': 30,
             'retries': 20,
+            'source_address': '0.0.0.0',
             'cachedir': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': 'android,ios,web,mweb', # Maximum compatibility
-                    # We removed player_skip as it was hiding formats
+                    'player_client': 'android',
+                    'player_skip': 'webpage,configs,js',
                     'include_ssl_logs': False
                 }
             }
@@ -135,60 +115,15 @@ class VideoDownloader:
         if cookie_file:
             base_opts['cookiefile'] = cookie_file
 
-        # Add geo-bypass and IPv4 forcing for cloud environments
-        base_opts['geo_bypass'] = True
-        base_opts['source_address'] = '0.0.0.0'  # Force IPv4
-
-        # For YouTube on cloud: Use residential proxy from the START
-        is_youtube = 'youtube.com' in url or 'youtu.be' in url
-        if is_youtube:
-            proxy = self._get_working_proxy()
-            if proxy:
-                base_opts['proxy'] = proxy
-                print(f"YouTube detected: Using residential proxy")
-
+        # Strategy 1: Direct Connection
         try:
-            # YouTube specific "Brute Force" Retry Strategy (ENHANCED for Cloud)
-            # We try different "extractor_args" configurations until one sticks
-            yt_configs = [
-                {'youtube': {'player_client': 'android_creator'}},  # NEW - Often bypasses cloud blocks
-                {'youtube': {'player_client': 'ios_creator'}},      # NEW - Alternative creator client
-                {'youtube': {'player_client': 'tv_embedded'}},      # NEW - TV client often works
-                {'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js'}}, # Fast
-                {'youtube': {'player_client': 'ios'}}, # Solid fallback
-                {'youtube': {'player_client': 'mweb'}}, # Mobile web
-                {'youtube': {'player_client': 'web'}}, # Traditional
-                {} # Default fallback
-            ]
-
-            last_error = "Unknown error"
+            with yt_dlp.YoutubeDL(base_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return self._process_info(info)
+        except Exception as e:
+            print(f"Direct fetch failed: {e}")
             
-            # If not YouTube, just use basic opts once
-            if not is_youtube:
-                try:
-                    with yt_dlp.YoutubeDL(base_opts) as ydl:
-                        info = ydl.extract_info(url, download=False)
-                        return self._process_info(info)
-                except Exception as e:
-                    return {'error': str(e)}
-
-            # Brute force YouTube configs
-            for config in yt_configs:
-                current_opts = base_opts.copy()
-                current_opts['extractor_args'] = config
-                try:
-                    print(f"DEBUG: Trying YouTube config: {config.get('youtube', {}).get('player_client', 'default')}")
-                    with yt_dlp.YoutubeDL(current_opts) as ydl:
-                        info = ydl.extract_info(url, download=False)
-                        return self._process_info(info)
-                except Exception as e:
-                    last_error = str(e)
-                    if "Requested format is not available" not in last_error:
-                        # If it's a hard error (403, etc.), try the proxy strategy next
-                        break
-                    continue # Try next config
-            
-            # Strategy 2: Proxy Fallback (with base opts)
+            # Strategy 2: Try Proxy
             proxy = self._get_working_proxy()
             if proxy:
                 print(f"Retrying with proxy: {proxy}")
@@ -198,9 +133,10 @@ class VideoDownloader:
                         info = ydl.extract_info(url, download=False)
                         return self._process_info(info)
                 except Exception as proxy_e:
-                     return {'error': f"Final attempt failed: {str(proxy_e)}"}
+                     print(f"Proxy fetch failed: {proxy_e}")
+                     return {'error': f"Direct & Proxy failed. Last error: {str(proxy_e)}"}
             
-            return {'error': last_error}
+            return {'error': str(e)}
         finally:
             if cookie_file and os.path.exists(cookie_file):
                 os.remove(cookie_file)
