@@ -249,6 +249,9 @@ class VideoDownloader:
             'merge_output_format': 'mp4',
             'ffmpeg_location': self.ffmpeg_location,
             'source_address': '0.0.0.0',
+            'postprocessor_args': {
+                'ffmpeg': ['-movflags', '+faststart']
+            },
             'extractor_args': {
                 'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js', 'include_ssl_logs': False}
             }
