@@ -119,55 +119,56 @@ class VideoDownloader:
         if cookie_file:
             base_opts['cookiefile'] = cookie_file
 
-        # YouTube specific "Brute Force" Retry Strategy
-        # We try different "extractor_args" configurations until one sticks
-        yt_configs = [
-            {'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js'}}, # Fastest, often works
-            {'youtube': {'player_client': 'ios'}}, # Solid fallback
-            {'youtube': {'player_client': 'web'}}, # Traditional
-            {} # Default fallback
-        ]
+        try:
+            # YouTube specific "Brute Force" Retry Strategy
+            # We try different "extractor_args" configurations until one sticks
+            yt_configs = [
+                {'youtube': {'player_client': 'android', 'player_skip': 'webpage,configs,js'}}, # Fastest, often works
+                {'youtube': {'player_client': 'ios'}}, # Solid fallback
+                {'youtube': {'player_client': 'web'}}, # Traditional
+                {} # Default fallback
+            ]
 
-        last_error = "Unknown error"
-        
-        # If not YouTube, just use basic opts once
-        if 'youtube.com' not in url and 'youtu.be' not in url:
-            try:
-                with yt_dlp.YoutubeDL(base_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    return self._process_info(info)
-            except Exception as e:
-                return {'error': str(e)}
+            last_error = "Unknown error"
+            
+            # If not YouTube, just use basic opts once
+            if 'youtube.com' not in url and 'youtu.be' not in url:
+                try:
+                    with yt_dlp.YoutubeDL(base_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        return self._process_info(info)
+                except Exception as e:
+                    return {'error': str(e)}
 
-        # Brute force YouTube configs
-        for config in yt_configs:
-            current_opts = base_opts.copy()
-            current_opts['extractor_args'] = config
-            try:
-                print(f"DEBUG: Trying YouTube config: {config.get('youtube', {}).get('player_client', 'default')}")
-                with yt_dlp.YoutubeDL(current_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    return self._process_info(info)
-            except Exception as e:
-                last_error = str(e)
-                if "Requested format is not available" not in last_error:
-                    # If it's a hard error (403, etc.), try the proxy strategy next
-                    break
-                continue # Try next config
-        
-        # Strategy 2: Proxy Fallback (with base opts)
-        proxy = self._get_working_proxy()
-        if proxy:
-            print(f"Retrying with proxy: {proxy}")
-            base_opts['proxy'] = proxy
-            try:
-                with yt_dlp.YoutubeDL(base_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    return self._process_info(info)
-            except Exception as proxy_e:
-                 return {'error': f"Final attempt failed: {str(proxy_e)}"}
-        
-        return {'error': last_error}
+            # Brute force YouTube configs
+            for config in yt_configs:
+                current_opts = base_opts.copy()
+                current_opts['extractor_args'] = config
+                try:
+                    print(f"DEBUG: Trying YouTube config: {config.get('youtube', {}).get('player_client', 'default')}")
+                    with yt_dlp.YoutubeDL(current_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        return self._process_info(info)
+                except Exception as e:
+                    last_error = str(e)
+                    if "Requested format is not available" not in last_error:
+                        # If it's a hard error (403, etc.), try the proxy strategy next
+                        break
+                    continue # Try next config
+            
+            # Strategy 2: Proxy Fallback (with base opts)
+            proxy = self._get_working_proxy()
+            if proxy:
+                print(f"Retrying with proxy: {proxy}")
+                base_opts['proxy'] = proxy
+                try:
+                    with yt_dlp.YoutubeDL(base_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        return self._process_info(info)
+                except Exception as proxy_e:
+                     return {'error': f"Final attempt failed: {str(proxy_e)}"}
+            
+            return {'error': last_error}
         finally:
             if cookie_file and os.path.exists(cookie_file):
                 os.remove(cookie_file)
