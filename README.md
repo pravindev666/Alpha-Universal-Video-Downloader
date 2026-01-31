@@ -70,6 +70,17 @@ Social media sites change their code frequently. To keep the downloader working:
 
 ---
 
+## 🖼️ Social Sharing Card (WhatsApp/Facebook)
+Streamlit Cloud handles the social preview card (the image you see when sharing the link). You cannot change this from the code.
+
+1.  Go to your app on **share.streamlit.io**.
+2.  Click the **Matches (⋮)** menu -> **Settings**.
+3.  Under **General**, you will see **"Social preview"**.
+4.  Upload the `social_preview.png` file included in this repo.
+
+
+---
+
 ## 🏗️ Architecture
 
 ### How strictly "Fetch" vs "Download" works
