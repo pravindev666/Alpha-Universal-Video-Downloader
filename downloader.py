@@ -123,7 +123,7 @@ class VideoDownloader:
                 }
         except Exception as e:
             print(f"Error getting info: {e}")
-            return None
+            return {'error': str(e)}
         finally:
             # Cleanup cookie file
             if cookie_file and os.path.exists(cookie_file):

@@ -33,11 +33,17 @@ def main():
             with st.spinner("Fetching video info..."):
                 # Pass cookies to get_video_info
                 info = downloader.get_video_info(url)
-                if info:
+                
+                if info and 'error' not in info:
                     st.session_state['video_info'] = info
                     st.session_state['last_url'] = url
                 else:
-                    st.error("Could not fetch video info. Please check the URL.")
+                    error_msg = info.get('error') if info else "Unknown error"
+                    st.error(f"❌ Error fetching video: {error_msg}")
+                    if "403" in error_msg:
+                         st.warning("⚠️ YouTube is blocking the connection. This is common with Cloud Servers.")
+                    elif "Sign in" in error_msg:
+                         st.warning("⚠️ This video requires a login (Age Restricted or Premium).")
 
         if 'video_info' in st.session_state and st.session_state.get('last_url') == url:
             info = st.session_state['video_info']
