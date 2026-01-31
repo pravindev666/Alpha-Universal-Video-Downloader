@@ -27,12 +27,18 @@ def main():
     # Logic handles 'url' variable which is updated upon form submission
 
     # Logic handles 'url' variable which is updated upon form submission
+    
+    # Cookie Upload (Optional)
+    cookies = st.file_uploader("🍪 Cookies (Optional - for private/age-restricted videos)", type=['txt', 'cookies'], help="Upload Netscape cookies.txt file")
 
     if url:
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
             with st.spinner("Fetching video info..."):
+                # Handle cookies
+                cookies_content = cookies.getvalue().decode("utf-8") if cookies else None
+                
                 # Pass cookies to get_video_info
-                info = downloader.get_video_info(url, cookies_content=cookies if cookies else None)
+                info = downloader.get_video_info(url, cookies_content=cookies_content)
                 
                 if info and 'error' not in info:
                     st.session_state['video_info'] = info
@@ -76,7 +82,8 @@ def main():
             # Download Action
             if st.button("Fetch Video", type="primary"):
                 # Pass cookies to download_wrapper
-                download_wrapper(downloader, url, selected_format_id, cookies if cookies else None)
+                cookies_content = cookies.getvalue().decode("utf-8") if cookies else None
+                download_wrapper(downloader, url, selected_format_id, cookies_content)
             
             # Show download button if file exists in session
             if 'last_file' in st.session_state and st.session_state.get('last_url_downloaded') == url:
