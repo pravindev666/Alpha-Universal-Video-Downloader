@@ -76,6 +76,30 @@ def main():
                     except Exception as e:
                         st.error(f"Error opening file: {e}")
 
+    # Footer
+    st.markdown("---")
+    # Footer
+    st.markdown("---")
+    st.markdown(
+        """
+<div style='text-align: center; color: #666;'>
+    <h3 style='margin-bottom: 5px; font-size: 24px;'>App by Pravin A Mathew</h3>
+    <p style='font-size: 0.8em; margin: 0;'>Property of Zeta Aztra Technologies</p>
+    <p style='font-size: 0.8em; margin: 0;'>Operated by Zeta Aztra Technologies (Individual Proprietorship, India)</p>
+    <p style='font-size: 0.8em; margin-top: 5px; margin-bottom: 15px;'>© 2026 Zeta Aztra Technologies. All Rights Reserved.</p>
+    <p style='color: #ff4b4b; font-weight: bold; margin-bottom: 5px;'>⚠️ DISCLAIMER: FOR PERSONAL USE ONLY</p>
+    <p style='font-size: 0.75em; line-height: 1.4; max-width: 800px; margin: 0 auto;'>
+        This tool is designed for educational purposes and personal archiving only. 
+        Users are responsible for ensuring they have the right to download and use the content. 
+        Running this tool to infringe on copyright or violate terms of service of any platform is strictly prohibited. 
+        The author accepts no liability for misuse of this application.
+    </p>
+</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def download_wrapper(downloader, url, format_selector):
     progress_bar = st.progress(0)
     status_text = st.empty()
