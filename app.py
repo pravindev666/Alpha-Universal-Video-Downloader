@@ -26,15 +26,23 @@ def main():
             
     # Logic handles 'url' variable which is updated upon form submission
 
+    # Logic handles 'url' variable which is updated upon form submission
+
+    # Advanced Options (Cookies)
+    with st.expander("🔓 Advanced Options (Fix Download Errors)"):
+        st.info("If you see '403 Forbidden' errors, paste your **Netscape Format** cookies here. Use an extension like 'Get cookies.txt LOCALLY' to get them from YouTube.")
+        cookies = st.text_area("Paste Cookies Here:", placeholder="# Netscape HTTP Cookie File...\n.youtube.com\tTRUE\t/...")
+
     if url:
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
             with st.spinner("Fetching video info..."):
-                info = downloader.get_video_info(url)
+                # Pass cookies to get_video_info
+                info = downloader.get_video_info(url, cookies_content=cookies if cookies else None)
                 if info:
                     st.session_state['video_info'] = info
                     st.session_state['last_url'] = url
                 else:
-                    st.error("Could not fetch video info. Please check the URL.")
+                    st.error("Could not fetch video info. Please check the URL or try adding cookies.")
 
         if 'video_info' in st.session_state and st.session_state.get('last_url') == url:
             info = st.session_state['video_info']
@@ -66,7 +74,8 @@ def main():
             
             # Download Action
             if st.button("Fetch Video", type="primary"):
-                download_wrapper(downloader, url, selected_format_id)
+                # Pass cookies to download_wrapper
+                download_wrapper(downloader, url, selected_format_id, cookies if cookies else None)
             
             # Show download button if file exists in session
             if 'last_file' in st.session_state and st.session_state.get('last_url_downloaded') == url:
@@ -108,7 +117,7 @@ def main():
     )
 
 
-def download_wrapper(downloader, url, format_selector):
+def download_wrapper(downloader, url, format_selector, cookies_content=None):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
@@ -122,7 +131,8 @@ def download_wrapper(downloader, url, format_selector):
         result = downloader.download_video(
             url, 
             format_selector=format_selector,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            cookies_content=cookies_content
         )
         q.put({'done': True, 'result': result})
 
