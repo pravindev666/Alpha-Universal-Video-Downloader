@@ -4,7 +4,6 @@ import queue
 import time
 import os
 from downloader import VideoDownloader
-from utils.thumbnail import load_thumbnail
 
 st.set_page_config(page_title="Universal Media Downloader", page_icon="⬇️")
 
