@@ -53,12 +53,12 @@ class VideoDownloader:
 
     def _sanitize_url(self, url: str) -> str:
         """Clean URL, handle partial paths, and normalize domains"""
-        # 1. Strip all whitespace (internal and external)
+        import re
+        # 1. Deep clean: Remove ALL whitespace types (including hidden ones)
         url = re.sub(r'\s+', '', url)
         
         # 2. Handle partial paths (e.g., "/t/ID", "t/ID", "/post/ID")
-        if not url.startswith('http'):
-            # Remove leading slash for consistency
+        if not url.startswith('http') and not url.startswith('instagram:'):
             clean_path = url.lstrip('/')
             if clean_path.startswith('t/') or clean_path.startswith('post/'):
                 url = f"https://www.threads.net/{clean_path}"
@@ -75,13 +75,19 @@ class VideoDownloader:
             if match:
                 post_id = match.group(1)
                 url = f"https://www.threads.net/t/{post_id}"
+
+        # 5. THE "FORCE IE" TRICK: Propose using Instagram extractor for Threads
+        # Prepending 'instagram:' allows us to bypass yt-dlp's internal regex check
+        if 'threads.net' in url and not url.startswith('instagram:'):
+             url = f"instagram:{url}"
                 
         return url
 
     def get_video_info(self, url: str, cookies_content: str = None) -> Optional[Dict]:
         """Extract video metadata with robust fallbacks"""
         url = self._sanitize_url(url)
-        print(f"DEBUG: Processing sanitized URL: {url}")
+        # Use a more visible debug log
+        print(f"CRITICAL_DEBUG: Target URL is --> {url}")
         
         cookie_file = None
         if cookies_content:

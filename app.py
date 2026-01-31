@@ -13,6 +13,9 @@ def main():
 
     # Initialize downloader
     downloader = VideoDownloader()
+    
+    # Debug Area (Hidden by default, shown on failure)
+    debug_container = st.empty()
 
     # CRITICAL: Clear session if URL changes to avoid "ghost" metadata
     if 'last_url' not in st.session_state:
@@ -86,8 +89,12 @@ def main():
                     st.session_state['last_url'] = url
                 else:
                     error_msg = info.get('error') if info else "Unknown error"
+                    processed_url = downloader._sanitize_url(url)
                     with status_area:
                         st.error(f"❌ Error fetching video: {error_msg}")
+                        st.caption(f"Processed URL: `{processed_url}`")
+                        if "Unsupported URL" in error_msg:
+                            st.info("💡 **Hint:** Threads links are tricky. We are using a 'Force IE' trick (prepending `instagram:`) to bypass the error.")
                         if "403" in error_msg:
                             st.warning("⚠️ YouTube is blocking the connection. This is common with Cloud Servers.")
                         elif "Sign in" in error_msg or "login required" in error_msg.lower():
