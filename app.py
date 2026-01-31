@@ -32,7 +32,7 @@ def main():
         if 'video_info' not in st.session_state or st.session_state.get('last_url') != url:
             with st.spinner("Fetching video info..."):
                 # Pass cookies to get_video_info
-                info = downloader.get_video_info(url)
+                info = downloader.get_video_info(url, cookies_content=cookies if cookies else None)
                 
                 if info and 'error' not in info:
                     st.session_state['video_info'] = info
@@ -76,7 +76,7 @@ def main():
             # Download Action
             if st.button("Fetch Video", type="primary"):
                 # Pass cookies to download_wrapper
-                download_wrapper(downloader, url, selected_format_id)
+                download_wrapper(downloader, url, selected_format_id, cookies if cookies else None)
             
             # Show download button if file exists in session
             if 'last_file' in st.session_state and st.session_state.get('last_url_downloaded') == url:

@@ -38,11 +38,13 @@ class VideoDownloader:
             'nocheckcertificate': True,
             'ignoreerrors': False,
             'logtostderr': False,
-            # Anti-bot options (Standard Android Client)
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'referer': 'https://www.youtube.com/',
+            # Anti-bot options (Force IPv4 + Android)
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'referer': 'https://www.google.com/',
             'socket_timeout': 30,
             'retries': 20,
+            'source_address': '0.0.0.0', # Force IPv4 which is often less blocked than IPv6
+            'cachedir': False, # Disable cache to prevent stale 403s
             'extractor_args': {
                 'youtube': {
                     'player_client': 'android',
