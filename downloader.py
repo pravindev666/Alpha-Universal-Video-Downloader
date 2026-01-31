@@ -133,7 +133,7 @@ class VideoDownloader:
                       format_selector: str = 'best',
                       progress_callback=None,
                       cookies_content: str = None) -> Dict:
-        """Download video with progress callback and optional cookies"""
+        """Download video with robust fallback strategy"""
         
         cookie_file = None
         if cookies_content:
@@ -158,55 +158,82 @@ class VideoDownloader:
                         'status': 'finished',
                         'filename': d.get('filename', '')
                     })
+
+        # Define a strategy: Try requested format first, then fallbacks
+        strategies = [format_selector]
         
-        ydl_opts = {
-            'outtmpl': str(self.output_dir / '%(title)s.%(ext)s'),
-            'progress_hooks': [progress_hook],
-            'restrictfilenames': True,
-            'merge_output_format': 'mp4',
-            'format_sort': ['res', 'ext:mp4:m4a'],
-            'ffmpeg_location': self.ffmpeg_location,
-            # Add stronger client options for download too
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['ios', 'android', 'web'],
-                    'player_skip': ['webpage', 'configs', 'js'],
-                    'include_ssl_logs': [False]
+        # Only add fallbacks if we are not in audio_only mode (audio usually just works)
+        if format_selector != 'audio_only':
+            strategies.extend([
+                'best[ext=mp4]',           # Best MP4
+                'best[height<=720]',       # Safe HD
+                'best',                    # Anything
+                'worst[ext=mp4]'           # Emergency low quality
+            ])
+
+        last_error = None
+        
+        for fmt in strategies:
+            # Prepare options for this attempt
+            ydl_opts = {
+                'outtmpl': str(self.output_dir / '%(title)s.%(ext)s'),
+                'progress_hooks': [progress_hook],
+                'restrictfilenames': True,
+                'merge_output_format': 'mp4',
+                'ffmpeg_location': self.ffmpeg_location,
+                # Use standard Android client
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': 'android',
+                        'player_skip': 'webpage,configs,js',
+                        'include_ssl_logs': False
+                    }
                 }
             }
-        }
+            
+            if cookie_file:
+                ydl_opts['cookiefile'] = cookie_file
 
-        if cookie_file:
-            ydl_opts['cookiefile'] = cookie_file
+            # Configure format
+            if fmt == 'audio_only':
+                ydl_opts.update({
+                    'format': 'bestaudio/best',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }],
+                })
+            else:
+                ydl_opts['format'] = fmt
 
-        if format_selector == 'audio_only':
-            ydl_opts.update({
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-            })
-        else:
-            ydl_opts['format'] = format_selector
-        
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                
-                if format_selector == 'audio_only':
-                    filename = str(Path(filename).with_suffix('.mp3'))
+            try:
+                # print(f"Trying format: {fmt}") 
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    filename = ydl.prepare_filename(info)
                     
-                return {
-                    'success': True,
-                    'filename': filename,
-                    'title': info.get('title'),
-                    'duration': info.get('duration', 0)
-                }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-        finally:
-            if cookie_file and os.path.exists(cookie_file):
+                    if fmt == 'audio_only':
+                        filename = str(Path(filename).with_suffix('.mp3'))
+                        
+                    return {
+                        'success': True,
+                        'filename': filename,
+                        'title': info.get('title'),
+                        'duration': info.get('duration', 0)
+                    }
+            except Exception as e:
+                # print(f"Format {fmt} failed: {e}")
+                last_error = str(e)
+                # If audio only fails, it likely won't work with other video formats if it's a network/cookie issue,
+                # but we continue anyway just in case.
+                continue
+        
+        # If all strategies failed
+        return {'success': False, 'error': f"All attempts failed. Last error: {last_error}"}
+        
+        if cookie_file and os.path.exists(cookie_file):
+            try:
                 os.remove(cookie_file)
+            except:
+                pass
