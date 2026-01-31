@@ -75,11 +75,6 @@ class VideoDownloader:
             if match:
                 post_id = match.group(1)
                 url = f"https://www.threads.net/t/{post_id}"
-
-        # 5. THE "FORCE IE" TRICK: Propose using Instagram extractor for Threads
-        # Prepending 'instagram:' allows us to bypass yt-dlp's internal regex check
-        if 'threads.net' in url and not url.startswith('instagram:'):
-             url = f"instagram:{url}"
                 
         return url
 
